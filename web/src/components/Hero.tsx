@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { ArrowRight, Play, Star, Users, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Navbar from "./Navbar"
+import { useRouter } from "next/navigation"
 
 // Mock BackgroundGradientAnimation component
 const BackgroundGradientAnimation = ({ children }: { children: React.ReactNode }) => {
@@ -13,6 +14,7 @@ const BackgroundGradientAnimation = ({ children }: { children: React.ReactNode }
     </div>
   );
 };
+
 
 // Mock Moving Border Button component
 const Button = ({ 
@@ -34,7 +36,7 @@ const Button = ({
           className
         )}
         {...props}
-      >
+        >
         {children}
       </button>
     </div>
@@ -43,7 +45,8 @@ const Button = ({
 
 const Hero = () => {
   const [mounted, setMounted] = useState(false);
-
+  const router = useRouter();
+  
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -110,6 +113,7 @@ const Hero = () => {
 
                   <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                     <Button
+                      onClick={() => router.push("/resume-analysis")}
                       className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 hover:from-blue-700 hover:to-purple-700 px-6 md:px-8 py-3 md:py-4 text-base md:text-lg font-semibold shadow-2xl"
                       containerClassName="w-full sm:w-auto"
                     >
