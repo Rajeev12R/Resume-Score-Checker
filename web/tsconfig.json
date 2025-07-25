@@ -34,7 +34,7 @@
     "next-env.d.ts",
     "web/.next/types/**/*.ts",
     ".next/types/**/*.ts"
-  ],
+, "src/app/resume-analysis/page.tsx"  ],
   "exclude": [
     "web/node_modules"
   ]

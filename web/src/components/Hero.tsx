@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react"
 import { ArrowRight, Play, Star, Users, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
-import Navbar from "./Navbar"
 import { useRouter } from "next/navigation"
 
 // Mock BackgroundGradientAnimation component
@@ -56,7 +55,6 @@ const Hero = () => {
     <div className="relative min-h-screen">
       <BackgroundGradientAnimation>
         <div className="relative z-10 min-h-screen flex flex-col">
-          <Navbar />
 
           {/* Main Hero Section */}
           <div className="flex-1 px-6 py-8 md:py-16 flex items-center">
