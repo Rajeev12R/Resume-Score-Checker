@@ -4,7 +4,7 @@ import TestimonialSection from "@/components/Testimonials"
 
 const page = () => {
   return (
-    <div className="flex flex-col gap-20 min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       <Hero />
       <FeatureSection />
       <TestimonialSection/>
