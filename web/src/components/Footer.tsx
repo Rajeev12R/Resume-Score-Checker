@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion"
 import { Github, Twitter, Instagram, Linkedin } from "lucide-react"
+import Logo from "./logo"
 
 export default function Footer() {
   const socialLinks = [
@@ -44,11 +45,7 @@ export default function Footer() {
           {/* Left side - Copyright */}
           <div className="flex items-center gap-4 text-gray-600">
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-600 to-pink-500 rounded-xl shadow-lg"></div>
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-400 rounded-xl blur-sm opacity-50"></div>
-              </div>
-              <span className="font-bold text-gray-900">ResumeAI</span>
+              <Logo/>
             </div>
             <span className="text-gray-400">|</span>
             <span className="text-sm">© 2025 ResumeAI. All rights reserved.</span>
