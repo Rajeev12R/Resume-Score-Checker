@@ -1,15 +1,28 @@
 "use client"
 
 import type React from "react"
-
+import { useUser, useClerk, useAuth } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
-import { ArrowRight, Play, Star, Users, Zap, TrendingUp, Shield, Award } from "lucide-react"
+import {
+  ArrowRight,
+  Play,
+  Star,
+  Users,
+  Zap,
+  TrendingUp,
+  Shield,
+  Award,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 
 // Mock BackgroundGradientAnimation component
-const BackgroundGradientAnimation = ({ children }: { children: React.ReactNode }) => {
+const BackgroundGradientAnimation = ({
+  children,
+}: {
+  children: React.ReactNode
+}) => {
   return (
     <div className="relative bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
       <div className="absolute inset-0 bg-gradient-to-r from-blue-100/30 via-purple-100/30 to-pink-100/30 animate-pulse"></div>
@@ -37,7 +50,7 @@ const Button = ({
       <button
         className={cn(
           "relative px-8 py-4 rounded-full font-semibold transition-all duration-300 hover:shadow-lg transform hover:scale-105",
-          className,
+          className
         )}
         {...props}
       >
@@ -215,11 +228,23 @@ const Hero = () => {
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
+  const { user } = useUser()
+  const { isSignedIn } = useAuth()
+  const { openSignIn } = useClerk()
+
   useEffect(() => {
     setMounted(true)
   }, [])
 
   if (!mounted) return null
+
+  const handleProtectedClick = async () => {
+    if (isSignedIn) {
+      router.push("/resume-analysis")
+    } else {
+      openSignIn()
+    }
+  }
 
   return (
     <div className="relative min-h-screen">
@@ -254,7 +279,12 @@ const Hero = () => {
                     color: "text-green-600",
                     bg: "from-green-50 to-green-100",
                   },
-                  { icon: Shield, text: "ATS Optimized", color: "text-purple-600", bg: "from-purple-50 to-purple-100" },
+                  {
+                    icon: Shield,
+                    text: "ATS Optimized",
+                    color: "text-purple-600",
+                    bg: "from-purple-50 to-purple-100",
+                  },
                 ].map((item, index) => (
                   <motion.div
                     key={index}
@@ -265,7 +295,9 @@ const Hero = () => {
                     whileHover={{ scale: 1.05, y: -3 }}
                   >
                     <item.icon className={`w-4 h-4 ${item.color}`} />
-                    <span className="text-sm font-semibold text-gray-700">{item.text}</span>
+                    <span className="text-sm font-semibold text-gray-700">
+                      {item.text}
+                    </span>
                   </motion.div>
                 ))}
               </motion.div>
@@ -311,7 +343,8 @@ const Hero = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.4 }}
                   >
-                    Get instant, AI-powered resume analysis that identifies gaps, optimizes keywords, and{" "}
+                    Get instant, AI-powered resume analysis that identifies
+                    gaps, optimizes keywords, and{" "}
                     <span className="font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                       triples your interview chances
                     </span>{" "}
@@ -338,8 +371,12 @@ const Hero = () => {
                       ))}
                     </div>
                     <div className="text-left">
-                      <div className="font-semibold text-gray-800">25,000+ professionals</div>
-                      <div className="text-sm text-gray-500">already transformed their careers</div>
+                      <div className="font-semibold text-gray-800">
+                        25,000+ professionals
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        already transformed their careers
+                      </div>
                     </div>
                   </motion.div>
 
@@ -352,7 +389,7 @@ const Hero = () => {
                     <Button
                       className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-0 hover:from-blue-700 hover:to-purple-700 px-8 py-4 text-lg font-semibold shadow-2xl hover:shadow-blue-500/25"
                       containerClassName="w-full sm:w-auto"
-                      onClick={() => router.push("/resume-analysis")}
+                      onClick={handleProtectedClick}
                     >
                       <motion.span
                         className="flex items-center gap-2"
