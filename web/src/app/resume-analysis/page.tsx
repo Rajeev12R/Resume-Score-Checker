@@ -1,3 +1,5 @@
+//web\src\app\resume-analysis\page.tsx
+
 "use client"
 
 import { useState, useCallback } from "react"
@@ -10,6 +12,59 @@ import CoverLetterFormModal from "@/components/resume-analysis/cover-letter-form
 import CoverLetterResultModal from "@/components/resume-analysis/cover-letter-result-modal"
 import ExtractedTextModal from "@/components/resume-analysis/extracted-text-modal"
 
+
+interface CoverLetterData {
+  companyName: string
+  roleTitle: string
+  industry: string
+  companyValues: string
+  personalTouch: string
+  tone: string
+  experienceLevel: string
+  coverLetterType: string
+  keyAchievements: string
+  preferredLength: string
+}
+
+interface CoverLetterResult {
+  cover_letter: string
+  quality_metrics?: {
+    overall_score: number
+    component_scores: {
+      ai_avoidance: number
+      sentence_variation: number
+      personalization: number
+      achievement_metrics: number
+      keyword_alignment: number
+      power_verbs: number
+      language_quality: number
+    }
+    issues: string[]
+    recommendation: string
+  }
+  effectiveness_analysis?: {
+    readability_metrics: {
+      word_count: number
+      paragraph_count: number
+      avg_words_per_paragraph: number
+      reading_level: string
+    }
+    content_analysis: {
+      skill_coverage: number
+      mentioned_skills: string[]
+      missing_jd_skills: string[]
+      quantified_achievements: number
+    }
+    improvement_suggestions: string[]
+  }
+  industry_optimization?: {
+    industry: string
+    tone_applied: string
+    length_category: string
+    industry_keywords_used: string[]
+  }
+}
+
 export default function ResumeAnalyzerPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [jdText, setJdText] = useState("")
@@ -21,11 +76,20 @@ export default function ResumeAnalyzerPage() {
 
   // Cover Letter states
   const [showCoverLetterForm, setShowCoverLetterForm] = useState(false)
-  const [coverLetterData, setCoverLetterData] = useState({
+  const [coverLetterData, setCoverLetterData] = useState<CoverLetterData>({
     companyName: "",
     roleTitle: "",
+    industry: "",
+    companyValues: "",
     personalTouch: "",
-  })
+    tone: "professional",
+    experienceLevel: "mid-level",
+    coverLetterType: "application",
+    keyAchievements: "",
+    preferredLength: "medium"
+  });
+
+  const [coverLetterResult, setCoverLetterResult] = useState<CoverLetterResult | null>(null);
   const [coverLetter, setCoverLetter] = useState("")
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false)
   const [showCoverLetterResult, setShowCoverLetterResult] = useState(false)
@@ -42,39 +106,55 @@ export default function ResumeAnalyzerPage() {
   }, [])
 
   const handleGenerateCoverLetter = async () => {
-    if (!resumeFile || !jdText || !coverLetterData.companyName || !coverLetterData.roleTitle) {
-      alert("Please ensure resume, job description, company name, and role title are provided.")
-      return
-    }
-
-    setIsGeneratingCoverLetter(true)
-    const formData = new FormData()
-    formData.append("resume", resumeFile)
-    formData.append("jd_text", jdText)
-    formData.append("company_name", coverLetterData.companyName)
-    formData.append("role_title", coverLetterData.roleTitle)
-    formData.append("personal_touch", coverLetterData.personalTouch || "")
-
-    try {
-      const res = await fetch("http://localhost:8000/generate-cover-letter/", {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) {
-        const errorData = await res.json()
-        throw new Error(errorData.detail || "Server error")
-      }
-      const data = await res.json()
-      setCoverLetter(data.cover_letter)
-      setShowCoverLetterResult(true)
-      setShowCoverLetterForm(false)
-    } catch (error) {
-      console.error("Error:", error)
-      alert(`Error generating cover letter: ${error instanceof Error ? error.message : "Something went wrong"}`)
-    } finally {
-      setIsGeneratingCoverLetter(false)
-    }
+  if (!resumeFile || !jdText || !coverLetterData.companyName || !coverLetterData.roleTitle) {
+    alert("Please ensure resume, job description, company name, and role title are provided.");
+    return;
   }
+
+  setIsGeneratingCoverLetter(true);
+  const formData = new FormData();
+  formData.append("resume", resumeFile);
+  formData.append("jd_text", jdText);
+  formData.append("company_name", coverLetterData.companyName);
+  formData.append("role_title", coverLetterData.roleTitle);
+  formData.append("industry", coverLetterData.industry);
+  formData.append("company_values", coverLetterData.companyValues);
+  formData.append("personal_touch", coverLetterData.personalTouch);
+  formData.append("tone", coverLetterData.tone);
+  formData.append("experience_level", coverLetterData.experienceLevel);
+  formData.append("cover_letter_type", coverLetterData.coverLetterType);
+  formData.append("key_achievements", coverLetterData.keyAchievements);
+  formData.append("preferred_length", coverLetterData.preferredLength);
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+    const res = await fetch("http://localhost:8000/generate-cover-letter/", {
+      method: "POST",
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || "Server error");
+    }
+
+    const data = await res.json();
+    setCoverLetterResult(data);
+    setCoverLetter(data.cover_letter);
+    setShowCoverLetterResult(true);
+    setShowCoverLetterForm(false);
+  } catch (error) {
+    console.error("Error:", error);
+    alert(`Error generating cover letter: ${error instanceof Error ? error.message : "Something went wrong"}`);
+  } finally {
+    setIsGeneratingCoverLetter(false);
+  }
+};
 
   const handleCopyCoverLetter = () => {
     navigator.clipboard.writeText(coverLetter)
@@ -127,21 +207,29 @@ export default function ResumeAnalyzerPage() {
   }
 
   const handleStartOver = () => {
-    setAnalysisResult(null)
-    setExtractedText(null)
-    setShowExtractedText(false)
-    setResumeFile(null)
-    setJdText("")
-    setActiveSection(null)
-    setCoverLetter("")
-    setShowCoverLetterResult(false)
-    setShowCoverLetterForm(false)
+    setAnalysisResult(null);
+    setExtractedText(null);
+    setShowExtractedText(false);
+    setResumeFile(null);
+    setJdText("");
+    setActiveSection(null);
+    setCoverLetter("");
+    setCoverLetterResult(null);
+    setShowCoverLetterResult(false);
+    setShowCoverLetterForm(false);
     setCoverLetterData({
       companyName: "",
       roleTitle: "",
+      industry: "",
+      companyValues: "",
       personalTouch: "",
-    })
-  }
+      tone: "professional",
+      experienceLevel: "mid-level",
+      coverLetterType: "application",
+      keyAchievements: "",
+      preferredLength: "medium"
+    });
+  };
 
   const handleAnalyze = async () => {
     if (!resumeFile || !jdText) return
@@ -223,7 +311,7 @@ export default function ResumeAnalyzerPage() {
         {/* Modals */}
         {showCoverLetterForm && (
           <CoverLetterFormModal
-            showCoverLetterForm={showCoverLetterForm}
+            showCoverLetterForm={showCoverLetterForm} 
             setShowCoverLetterForm={setShowCoverLetterForm}
             coverLetterData={coverLetterData}
             setCoverLetterData={setCoverLetterData}
@@ -232,11 +320,11 @@ export default function ResumeAnalyzerPage() {
           />
         )}
 
-        {showCoverLetterResult && (
+        {showCoverLetterResult && coverLetterResult && (
           <CoverLetterResultModal
             showCoverLetterResult={showCoverLetterResult}
             setShowCoverLetterResult={setShowCoverLetterResult}
-            coverLetter={coverLetter}
+            coverLetterResult={coverLetterResult}
             coverLetterData={coverLetterData}
             handleCopyCoverLetter={handleCopyCoverLetter}
             handleDownloadCoverLetter={handleDownloadCoverLetter}
