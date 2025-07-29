@@ -1,3 +1,5 @@
+# server/main.py
+
 from fastapi import FastAPI, UploadFile, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -13,6 +15,8 @@ from typing import Optional, List
 import asyncio
 from datetime import datetime
 import requests
+from collections import Counter
+import random
 
 # Load environment variables
 load_dotenv()
@@ -285,7 +289,7 @@ async def analyze_resume(
         prompt = build_analysis_prompt(jd_text, resume_text)
         
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
+        response = await model.generate_content_async(prompt)
         
         # Clean the response text to extract only the JSON
         response_text = response.text.strip()
@@ -314,7 +318,410 @@ async def analyze_resume(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# =====================================================================================
+# ENHANCED COVER LETTER GENERATION WITH HUMAN-CENTRIC OPTIMIZATION
+# =====================================================================================
 
+def get_industry_insights(industry: str) -> dict:
+    """Get comprehensive industry-specific insights for cover letter optimization"""
+    industry_data = {
+        "technology": {
+            "key_values": ["innovation", "scalability", "user experience", "technical excellence", "agility"],
+            "preferred_tone": "technical yet accessible, confident",
+            "focus_areas": ["problem-solving", "technical impact", "product outcomes", "team collaboration", "continuous learning"],
+            "power_verbs": ["engineered", "architected", "optimized", "deployed", "scaled", "automated", "innovated"],
+            "avoid_phrases": ["worked on", "helped with", "was responsible for", "team player"],
+            "keywords_priority": ["full-stack", "APIs", "cloud", "microservices", "CI/CD", "performance", "scalability"],
+            "story_angles": ["technical challenges overcome", "system improvements", "user impact", "efficiency gains"],
+            "company_research_focus": ["recent product launches", "technical stack", "engineering culture", "growth metrics"]
+        },
+        "finance": {
+            "key_values": ["accuracy", "compliance", "risk management", "data-driven decisions", "fiduciary responsibility"],
+            "preferred_tone": "precise, analytical, trustworthy",
+            "focus_areas": ["analytical rigor", "regulatory compliance", "risk assessment", "process improvement", "stakeholder management"],
+            "power_verbs": ["analyzed", "forecasted", "mitigated", "optimized", "structured", "validated", "streamlined"],
+            "avoid_phrases": ["approximately", "roughly", "I think", "might have"],
+            "keywords_priority": ["financial modeling", "risk analysis", "compliance", "ROI", "budgeting", "forecasting"],
+            "story_angles": ["cost savings achieved", "risk mitigation", "process improvements", "regulatory successes"],
+            "company_research_focus": ["financial performance", "regulatory environment", "market position", "recent transactions"]
+        },
+        "healthcare": {
+            "key_values": ["patient outcomes", "safety", "evidence-based practice", "compassion", "continuous improvement"],
+            "preferred_tone": "caring yet professional, detail-oriented",
+            "focus_areas": ["patient care quality", "safety protocols", "interdisciplinary collaboration", "compliance", "outcomes measurement"],
+            "power_verbs": ["improved", "implemented", "coordinated", "assessed", "monitored", "educated", "advocated"],
+            "avoid_phrases": ["just following protocols", "basic care", "routine procedures"],
+            "keywords_priority": ["patient safety", "quality improvement", "evidence-based", "interdisciplinary", "outcomes"],
+            "story_angles": ["patient outcome improvements", "safety initiatives", "process enhancements", "team leadership"],
+            "company_research_focus": ["patient satisfaction scores", "quality ratings", "specializations", "community impact"]
+        },
+        "marketing": {
+            "key_values": ["customer-centricity", "data-driven creativity", "brand building", "ROI focus", "innovation"],
+            "preferred_tone": "creative yet strategic, results-focused",
+            "focus_areas": ["campaign performance", "brand development", "customer insights", "digital proficiency", "growth marketing"],
+            "power_verbs": ["launched", "grew", "converted", "engaged", "amplified", "positioned", "activated"],
+            "avoid_phrases": ["created awareness", "did marketing", "posted content", "managed social media"],
+            "keywords_priority": ["conversion rates", "customer acquisition", "brand awareness", "digital marketing", "analytics"],
+            "story_angles": ["campaign successes", "growth achievements", "brand building", "customer engagement wins"],
+            "company_research_focus": ["brand positioning", "target audience", "recent campaigns", "growth metrics"]
+        },
+        "consulting": {
+            "key_values": ["strategic thinking", "client success", "analytical rigor", "adaptability", "thought leadership"],
+            "preferred_tone": "strategic, confident, solution-oriented",
+            "focus_areas": ["client outcomes", "strategic insights", "change management", "industry expertise", "relationship building"],
+            "power_verbs": ["advised", "strategized", "transformed", "delivered", "facilitated", "guided", "influenced"],
+            "avoid_phrases": ["provided support", "assisted with", "participated in", "contributed to"],
+            "keywords_priority": ["strategic planning", "change management", "stakeholder engagement", "business transformation"],
+            "story_angles": ["client transformation stories", "strategic wins", "change leadership", "industry insights"],
+            "company_research_focus": ["client portfolio", "service offerings", "thought leadership", "market reputation"]
+        }
+    }
+    
+    return industry_data.get(industry.lower(), {
+        "key_values": ["professionalism", "reliability", "results-driven", "adaptability"],
+        "preferred_tone": "professional and confident",
+        "focus_areas": ["relevant experience", "skill alignment", "cultural fit", "value creation"],
+        "power_verbs": ["achieved", "delivered", "improved", "led", "developed", "managed"],
+        "avoid_phrases": ["hard worker", "team player", "detail-oriented"],
+        "keywords_priority": ["leadership", "collaboration", "problem-solving", "results"],
+        "story_angles": ["achievements", "improvements", "leadership", "innovation"],
+        "company_research_focus": ["mission", "values", "recent news", "growth"]
+    })
+
+def extract_quantifiable_achievements(resume_text: str) -> List[dict]:
+    """Extract and structure quantifiable achievements from resume"""
+    achievements = []
+    
+    # Pattern matching for metrics
+    metric_patterns = [
+        r'(\d+)%\s*(increase|decrease|improvement|reduction|growth)',
+        r'\$(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(saved|generated|increased|reduced)',
+        r'(\d+(?:,\d{3})*)\s*(users|customers|clients|projects|team members)',
+        r'(\d+)\s*(months?|years?|weeks?)\s*(ahead of schedule|early|faster)',
+        r'(improved|increased|reduced|decreased|optimized).*?by\s*(\d+)%',
+        r'(\d+)x\s*(faster|improvement|increase|growth)',
+        r'from\s*(\d+).*?to\s*(\d+)',
+        r'(\d+)\+\s*(years?|projects?|clients?)'
+    ]
+    
+    lines = resume_text.split('\n')
+    for line in lines:
+        for pattern in metric_patterns:
+            matches = re.findall(pattern, line, re.IGNORECASE)
+            if matches:
+                achievements.append({
+                    "original_text": line.strip(),
+                    "metrics_found": matches,
+                    "line": line.strip()
+                })
+    
+    return achievements
+
+def extract_technical_skills(resume_text: str) -> dict:
+    """Extract and categorize technical skills from resume"""
+    skills_categories = {
+        "programming_languages": r'\b(Python|Java|JavaScript|TypeScript|C\+\+|C#|Go|Rust|Swift|Kotlin|PHP|Ruby|Scala|R|MATLAB)\b',
+        "frameworks": r'\b(React|Angular|Vue|Node\.js|Express|Django|Flask|Spring|Rails|Laravel|FastAPI|Next\.js)\b',
+        "databases": r'\b(MySQL|PostgreSQL|MongoDB|Redis|Elasticsearch|Oracle|SQLite|DynamoDB|Cassandra)\b',
+        "cloud_platforms": r'\b(AWS|Azure|Google Cloud|GCP|Heroku|DigitalOcean|Vercel|Netlify)\b',
+        "tools": r'\b(Docker|Kubernetes|Git|Jenkins|Terraform|Ansible|Jira|Slack|Figma|Photoshop)\b',
+        "methodologies": r'\b(Agile|Scrum|DevOps|CI/CD|TDD|Microservices|RESTful|GraphQL)\b'
+    }
+    
+    extracted_skills = {}
+    for category, pattern in skills_categories.items():
+        matches = re.findall(pattern, resume_text, re.IGNORECASE)
+        extracted_skills[category] = list(set([match.lower() for match in matches]))
+    
+    return extracted_skills
+
+def create_human_centric_prompt(
+    resume_text: str, jd_text: str, company_name: str, role_title: str,
+    industry: str, company_values: str, personal_touch: str, tone: str,
+    experience_level: str, cover_letter_type: str, key_achievements: str,
+    preferred_length: str, industry_insights: dict
+) -> str:
+    """Create the most advanced, human-centric cover letter generation prompt"""
+    
+    # Extract structured data from resume
+    achievements = extract_quantifiable_achievements(resume_text)
+    technical_skills = extract_technical_skills(resume_text)
+    
+    # Extract key requirements from JD
+    jd_keywords = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', jd_text)
+    jd_skills = re.findall(r'\b(?:Python|Java|JavaScript|React|Angular|AWS|Docker|SQL|API|Machine Learning|Data Analysis)\b', jd_text, re.IGNORECASE)
+    
+    length_specs = {
+        "short": {"paragraphs": "3 concise paragraphs", "words": "180-250 words", "style": "punchy and direct"},
+        "medium": {"paragraphs": "4 well-structured paragraphs", "words": "280-380 words", "style": "balanced detail and conciseness"},
+        "long": {"paragraphs": "4-5 comprehensive paragraphs", "words": "380-500 words", "style": "detailed and thorough"}
+    }
+    
+    tone_profiles = {
+        "professional": {
+            "style": "formal, respectful, business-appropriate",
+            "opening_style": "respectful and direct",
+            "enthusiasm_level": "measured confidence",
+            "language_complexity": "sophisticated but clear"
+        },
+        "enthusiastic": {
+            "style": "energetic, passionate, genuinely excited",
+            "opening_style": "compelling and dynamic",
+            "enthusiasm_level": "high energy without being overwhelming",
+            "language_complexity": "vivid and engaging"
+        },
+        "creative": {
+            "style": "unique voice while maintaining professionalism",
+            "opening_style": "innovative and memorable",
+            "enthusiasm_level": "authentic passion",
+            "language_complexity": "creative but professional"
+        }
+    }
+    
+    return f"""
+# EXPERT HUMAN-CENTRIC COVER LETTER GENERATION ENGINE
+## Mission: Create a cover letter that hiring managers will remember, that sounds completely human-written, and compels action
+
+### CANDIDATE PROFILE ANALYSIS:
+**Resume Content:** {resume_text[:1500]}...
+**Extracted Achievements:** {achievements[:3] if achievements else 'None found - will need to infer from context'}
+**Technical Skills Found:** {technical_skills}
+**Experience Level:** {experience_level}
+
+### TARGET OPPORTUNITY INTELLIGENCE:
+**Company:** {company_name}
+**Role:** {role_title}
+**Industry:** {industry}
+**Job Description:** {jd_text[:1000]}...
+**Key JD Skills:** {jd_skills[:10]}
+**Company Values:** {company_values or 'Research and extract from context'}
+**Personal Connection:** {personal_touch or 'None provided - create authentic connection'}
+
+### INDUSTRY-SPECIFIC OPTIMIZATION:
+**Industry Focus:** {industry_insights.get('focus_areas', [])}
+**Required Power Verbs:** {industry_insights.get('power_verbs', [])}
+**Phrases to Avoid:** {industry_insights.get('avoid_phrases', [])}
+**Priority Keywords:** {industry_insights.get('keywords_priority', [])}
+**Story Angles:** {industry_insights.get('story_angles', [])}
+
+### GENERATION SPECIFICATIONS:
+**Length:** {length_specs.get(preferred_length, length_specs['medium'])}
+**Tone Profile:** {tone_profiles.get(tone, tone_profiles['professional'])}
+**Cover Letter Type:** {cover_letter_type}
+**Key Achievements to Highlight:** {key_achievements or 'Extract best 2-3 from resume analysis'}
+
+### HUMAN-CENTRIC GENERATION RULES:
+
+#### AUTHENTICITY REQUIREMENTS:
+1. **NO GENERIC AI PHRASES:** Absolutely avoid "I am excited to apply", "team player", "think outside the box", "hit the ground running"
+2. **SPECIFIC COMPANY CONNECTIONS:** Must reference 2-3 specific things about {company_name} (products, mission, recent news, values)
+3. **QUANTIFIED ACHIEVEMENTS:** Include at least 2 metrics/numbers that demonstrate concrete impact
+4. **NATURAL LANGUAGE FLOW:** Vary sentence structure (30% complex, 50% medium, 20% short)
+5. **AUTHENTIC VOICE:** Sound like a real person who researched the company and role deeply
+
+#### STRUCTURAL EXCELLENCE:
+**Opening Paragraph (Hook + Value Proposition):**
+- Start with a specific connection to {company_name} or {role_title}
+- Lead with strongest relevant achievement or unique angle
+- Clearly state the position and demonstrate genuine research
+- End with a compelling value proposition
+
+**Body Paragraphs (Evidence + Alignment):**
+- Paragraph 2: Highlight 2-3 most relevant achievements with metrics
+- Paragraph 3: Demonstrate company/culture fit and industry understanding
+- Each achievement must connect to a specific JD requirement
+- Use industry-specific power verbs from: {industry_insights.get('power_verbs', [])}
+
+**Closing Paragraph (Call to Action):**
+- Synthesize value proposition
+- Reference next steps confidently
+- Professional yet memorable sign-off
+
+#### QUALITY SAFEGUARDS:
+- **Keyword Integration:** Naturally include 5-7 keywords from JD: {jd_skills[:7]}
+- **Sentence Variation:** No two consecutive sentences with same structure
+- **Power Verb Requirement:** Minimum 8 different action verbs
+- **Metric Integration:** At least 2 quantifiable results
+- **Company Research:** 2-3 specific {company_name} references
+- **Industry Alignment:** Use {industry} terminology naturally
+
+#### CONTENT DEVELOPMENT STRATEGY:
+1. **Research Demonstration:** Show deep understanding of {company_name}'s mission/products
+2. **Problem-Solution Framing:** Identify implicit challenges from JD and position candidate as solution
+3. **Story Arc Creation:** Weave career progression into narrative that leads logically to this opportunity
+4. **Future Value Projection:** Articulate specific contributions candidate will make
+
+### CRITICAL EXECUTION STANDARDS:
+- **Zero Clichés:** Every phrase must be fresh and specific
+- **Perfect Grammar:** Flawless mechanics and professional language
+- **ATS Optimization:** Natural keyword integration without stuffing
+- **Memorable Elements:** Include 1-2 details that will stick in reader's mind
+- **Cultural Resonance:** Match {industry} communication norms
+- **Action Orientation:** Focus on what candidate will DO, not just what they've done
+
+### OUTPUT REQUIREMENTS:
+Generate a cover letter that:
+1. Passes the "human written" test completely
+2. Demonstrates genuine research and interest
+3. Includes specific, quantifiable achievements
+4. Uses varied, sophisticated sentence structures
+5. Integrates keywords naturally
+6. Tells a compelling professional story
+7. Positions candidate as the ideal solution
+8. Compels the hiring manager to take action
+
+**Word Count Target:** {length_specs.get(preferred_length, length_specs['medium'])['words']}
+**Tone Execution:** {tone_profiles.get(tone, tone_profiles['professional'])['style']}
+
+### EXAMPLE OPENING STYLES (for reference):
+- **Research-Based:** "Your recent launch of [specific product] perfectly aligns with my passion for [relevant area]..."
+- **Achievement-Led:** "Having [specific achievement with metric], I was drawn to [company]'s commitment to [specific value]..."
+- **Problem-Solution:** "The challenge of [inferred from JD] is exactly what energized me during my work at [previous role]..."
+
+Generate the most compelling, human-sounding, and effective cover letter possible. This should be indistinguishable from what a top-tier career coach would write for their best client.
+"""
+
+def validate_human_quality(cover_letter: str, jd_text: str, company_name: str) -> dict:
+    """Comprehensive validation of cover letter human quality and effectiveness"""
+    
+    issues = []
+    scores = {}
+    
+    # 1. AI Detection Patterns
+    ai_phrases = [
+        "i am excited to apply", "team player", "think outside the box", 
+        "hit the ground running", "wear many hats", "go above and beyond",
+        "passionate about", "i believe i would be", "i am confident that"
+    ]
+    
+    ai_phrase_count = sum(1 for phrase in ai_phrases if phrase in cover_letter.lower())
+    if ai_phrase_count > 0:
+        issues.append(f"Contains {ai_phrase_count} generic AI phrases")
+    scores['ai_avoidance'] = max(0, 100 - (ai_phrase_count * 20))
+    
+    # 2. Sentence Structure Variation
+    sentences = [s.strip() for s in re.split(r'[.!?]', cover_letter) if s.strip()]
+    if len(sentences) < 3:
+        issues.append("Too few sentences for proper analysis")
+        scores['sentence_variation'] = 0
+    else:
+        word_counts = [len(s.split()) for s in sentences]
+        avg_length = sum(word_counts) / len(word_counts)
+        variation = max(word_counts) - min(word_counts)
+        
+        if variation < 8:
+            issues.append("Poor sentence length variation")
+        if avg_length < 12 or avg_length > 25:
+            issues.append(f"Average sentence length suboptimal: {avg_length:.1f} words")
+        
+        scores['sentence_variation'] = min(100, (variation * 5) + 40)
+    
+    # 3. Company-Specific Content
+    company_mentions = cover_letter.lower().count(company_name.lower())
+    if company_mentions == 0:
+        issues.append("Company name not mentioned")
+        scores['personalization'] = 0
+    elif company_mentions == 1:
+        issues.append("Company mentioned only once - needs more personalization")
+        scores['personalization'] = 40
+    else:
+        scores['personalization'] = min(100, company_mentions * 30)
+    
+    # 4. Quantifiable Achievements
+    metrics = re.findall(r'\d+%|\d+\+|\d+x|\$\d+(?:,\d{3})*|\d+(?:,\d{3})*\s*(?:users|customers|projects)', cover_letter)
+    if len(metrics) == 0:
+        issues.append("No quantifiable achievements included")
+        scores['achievement_metrics'] = 0
+    elif len(metrics) == 1:
+        scores['achievement_metrics'] = 60
+    else:
+        scores['achievement_metrics'] = 100
+    
+    # 5. Keyword Alignment
+    jd_keywords = set(re.findall(r'\b[a-zA-Z]{4,}\b', jd_text.lower()))
+    cover_keywords = set(re.findall(r'\b[a-zA-Z]{4,}\b', cover_letter.lower()))
+    keyword_overlap = len(jd_keywords & cover_keywords)
+    keyword_ratio = keyword_overlap / len(jd_keywords) if jd_keywords else 0
+    
+    if keyword_ratio < 0.15:
+        issues.append(f"Low keyword alignment: {keyword_ratio*100:.1f}%")
+    scores['keyword_alignment'] = min(100, keyword_ratio * 300)
+    
+    # 6. Power Verb Usage
+    power_verbs = ['led', 'developed', 'implemented', 'achieved', 'optimized', 'delivered', 'created', 'managed', 'improved', 'increased']
+    verb_count = sum(1 for verb in power_verbs if verb in cover_letter.lower())
+    scores['power_verbs'] = min(100, verb_count * 15)
+    
+    # 7. Professional Language Quality
+    weak_phrases = ['helped with', 'worked on', 'was responsible for', 'participated in', 'assisted with']
+    weak_count = sum(1 for phrase in weak_phrases if phrase in cover_letter.lower())
+    if weak_count > 0:
+        issues.append(f"Contains {weak_count} weak phrases")
+    scores['language_quality'] = max(0, 100 - (weak_count * 25))
+    
+    # 8. Overall Human Quality Score
+    overall_score = sum(scores.values()) / len(scores)
+    
+    return {
+        "overall_score": round(overall_score, 1),
+        "component_scores": scores,
+        "issues": issues,
+        "recommendation": "Excellent" if overall_score >= 85 else "Good" if overall_score >= 70 else "Needs Improvement"
+    }
+
+def analyze_cover_letter_effectiveness(cover_letter: str, jd_text: str, resume_text: str) -> dict:
+    """Analyze the effectiveness and provide actionable improvements"""
+    
+    word_count = len(cover_letter.split())
+    paragraph_count = len([p for p in cover_letter.split('\n\n') if p.strip()])
+    
+    # Extract mentioned skills and compare with JD
+    mentioned_skills = re.findall(r'\b(?:Python|Java|JavaScript|React|Angular|AWS|Docker|SQL|API|Machine Learning|Data Analysis|Leadership|Project Management)\b', 
+                                cover_letter, re.IGNORECASE)
+    jd_skills = re.findall(r'\b(?:Python|Java|JavaScript|React|Angular|AWS|Docker|SQL|API|Machine Learning|Data Analysis|Leadership|Project Management)\b', 
+                         jd_text, re.IGNORECASE)
+    
+    skill_coverage = len(set(mentioned_skills)) / len(set(jd_skills)) if jd_skills else 0
+    
+    return {
+        "readability_metrics": {
+            "word_count": word_count,
+            "paragraph_count": paragraph_count,
+            "avg_words_per_paragraph": round(word_count / paragraph_count, 1) if paragraph_count > 0 else 0,
+            "reading_level": "Professional" if 250 <= word_count <= 400 else "Check length"
+        },
+        "content_analysis": {
+            "skill_coverage": round(skill_coverage * 100, 1),
+            "mentioned_skills": list(set(mentioned_skills)),
+            "missing_jd_skills": list(set(jd_skills) - set(mentioned_skills)),
+            "quantified_achievements": len(re.findall(r'\d+%|\d+\+|\d+x|\$\d+', cover_letter))
+        },
+        "improvement_suggestions": generate_improvement_suggestions(cover_letter, jd_text, skill_coverage)
+    }
+
+def generate_improvement_suggestions(cover_letter: str, jd_text: str, skill_coverage: float) -> List[str]:
+    """Generate specific improvement suggestions"""
+    suggestions = []
+    
+    if skill_coverage < 0.5:
+        suggestions.append("Include more skills from the job description to improve relevance")
+    
+    if not re.search(r'\d+%|\d+\+|\d+x|\$\d+', cover_letter):
+        suggestions.append("Add quantifiable achievements with specific metrics")
+    
+    if 'company' not in cover_letter.lower():
+        suggestions.append("Reference the company more specifically to show research")
+    
+    weak_openings = ['i am writing', 'i am applying', 'i would like']
+    if any(opening in cover_letter.lower()[:50] for opening in weak_openings):
+        suggestions.append("Strengthen the opening with a more compelling hook")
+    
+    if len(cover_letter.split()) < 200:
+        suggestions.append("Expand content to provide more compelling evidence")
+    elif len(cover_letter.split()) > 500:
+        suggestions.append("Condense content to maintain reader engagement")
+    
+    return suggestions
 
 @app.post("/generate-cover-letter/")
 async def generate_cover_letter(
@@ -322,14 +729,20 @@ async def generate_cover_letter(
     jd_text: str = Form(...),
     company_name: str = Form(...),
     role_title: str = Form(...),
-    personal_touch: Optional[str] = Form(None)
+    industry: str = Form(...),
+    company_values: Optional[str] = Form(None),
+    personal_touch: Optional[str] = Form(None),
+    tone: str = Form(default="professional"),
+    experience_level: str = Form(default="mid-level"),
+    cover_letter_type: str = Form(default="application"),
+    key_achievements: Optional[str] = Form(None),
+    preferred_length: str = Form(default="medium")
 ):
-    """Generate a personalized cover letter based on resume and job description"""
     try:
+        # File processing
         content = await resume.read()
-        
-        # Extract resume text
         file_extension = resume.filename.lower().split('.')[-1] if resume.filename else ""
+        
         if file_extension == 'pdf':
             resume_text = extract_text_from_pdf(content)
         elif file_extension == 'docx':
@@ -337,88 +750,354 @@ async def generate_cover_letter(
         else:
             resume_text = content.decode("utf-8", errors="ignore")
 
+        if not resume_text or len(resume_text.strip()) < 50:
+            raise HTTPException(
+                status_code=422, 
+                detail="Could not extract readable text from the resume"
+            )
+
+        # Get industry insights
+        industry_insights = get_industry_insights(industry)
+        
+        # Create the advanced prompt
+        prompt = create_human_centric_prompt(
+            resume_text=resume_text,
+            jd_text=jd_text,
+            company_name=company_name,
+            role_title=role_title,
+            industry=industry,
+            company_values=company_values,
+            personal_touch=personal_touch,
+            tone=tone,
+            experience_level=experience_level,
+            cover_letter_type=cover_letter_type,
+            key_achievements=key_achievements,
+            preferred_length=preferred_length,
+            industry_insights=industry_insights
+        )
+
+        # Generate with optimized settings for human-like output
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        generation_config = {
+            "temperature": 0.8,  # Higher creativity for more human-like variation
+            "top_p": 0.9,
+            "max_output_tokens": 2048,
+            "candidate_count": 1
+        }
+        
+        response = model.generate_content(prompt, generation_config=generation_config)
+
+        if not response.text:
+            raise HTTPException(status_code=500, detail="Empty response from AI model")
+
+        cover_letter = response.text.strip()
+        
+        # Comprehensive quality validation
+        quality_validation = validate_human_quality(cover_letter, jd_text, company_name)
+        effectiveness_analysis = analyze_cover_letter_effectiveness(cover_letter, jd_text, resume_text)
+        
+        # If quality score is too low, regenerate with stricter prompt
+        if quality_validation["overall_score"] < 75:
+            enhanced_prompt = f"""
+{prompt}
+
+CRITICAL QUALITY ISSUES DETECTED - REGENERATE WITH THESE FIXES:
+{quality_validation["issues"]}
+
+MANDATORY REQUIREMENTS FOR REGENERATION:
+1. Include company name {company_name} at least 2 times naturally
+2. Add 2+ quantifiable achievements with specific metrics
+3. Use varied sentence structures (8-25 words per sentence)
+4. Avoid all generic AI phrases completely
+5. Include 5+ keywords from job description naturally
+6. Use minimum 6 different power verbs
+7. Create authentic, memorable opening and closing
+
+REGENERATE NOW with perfect human quality.
+"""
+            
+            response = model.generate_content(enhanced_prompt, generation_config=generation_config)
+            cover_letter = response.text.strip()
+            quality_validation = validate_human_quality(cover_letter, jd_text, company_name)
+
+        return JSONResponse(content={
+            "cover_letter": cover_letter,
+            "quality_metrics": quality_validation,
+            "effectiveness_analysis": effectiveness_analysis,
+            "industry_optimization": {
+                "industry": industry,
+                "tone_applied": tone,
+                "length_category": preferred_length,
+                "industry_keywords_used": industry_insights.get('keywords_priority', [])[:5]
+            },
+            "generation_metadata": {
+                "model_version": "gemini-1.5-flash",
+                "prompt_version": "human-centric-v2.0",
+                "temperature": 0.8,
+                "quality_score": quality_validation["overall_score"]
+            }
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/refine-cover-letter/")
+async def refine_cover_letter(
+    original_letter: str = Form(...),
+    refinement_type: str = Form(...),
+    specific_feedback: Optional[str] = Form(None),
+    target_company: str = Form(...),
+    target_role: str = Form(...),
+    industry: str = Form(...)
+):
+    """Advanced cover letter refinement with human-quality optimization"""
+    try:
+        industry_insights = get_industry_insights(industry)
+        
+        refinement_strategies = {
+            "tone": {
+                "objective": "Adjust tone while maintaining core message and human quality",
+                "focus": "Language style, enthusiasm level, formality"
+            },
+            "length": {
+                "objective": "Optimize length for maximum impact and readability", 
+                "focus": "Content density, paragraph structure, word economy"
+            },
+            "personalization": {
+                "objective": "Increase company-specific personalization and research demonstration",
+                "focus": "Company connections, role alignment, cultural fit"
+            },
+            "achievements": {
+                "objective": "Strengthen achievement presentation with better metrics and impact",
+                "focus": "Quantifiable results, value proposition, specificity"
+            },
+            "industry_alignment": {
+                "objective": f"Optimize for {industry} industry standards and expectations",
+                "focus": "Industry terminology, sector priorities, professional norms"
+            }
+        }
+        
+        strategy = refinement_strategies.get(refinement_type, refinement_strategies["tone"])
+        
         prompt = f"""
-Generate a professional cover letter based on the following information:
+# EXPERT COVER LETTER REFINEMENT ENGINE
+## Mission: Refine cover letter to achieve perfect human quality and maximum effectiveness
 
-Resume:
-{resume_text}
+### ORIGINAL COVER LETTER:
+{original_letter}
 
-Job Description:
-{jd_text}
+### REFINEMENT SPECIFICATIONS:
+**Type:** {refinement_type}
+**Objective:** {strategy['objective']}
+**Focus Areas:** {strategy['focus']}
+**Target Company:** {target_company}
+**Target Role:** {target_role}
+**Industry:** {industry}
+**Specific Feedback:** {specific_feedback or 'None provided'}
 
-Company Name: {company_name}
-Role Title: {role_title}
-Personal Touch: {personal_touch if personal_touch else "None provided"}
+### INDUSTRY OPTIMIZATION GUIDELINES:
+**Industry Standards:** {industry_insights.get('preferred_tone', 'professional')}
+**Power Verbs to Use:** {industry_insights.get('power_verbs', [])}
+**Key Focus Areas:** {industry_insights.get('focus_areas', [])}
+**Avoid Phrases:** {industry_insights.get('avoid_phrases', [])}
 
-Create a compelling cover letter that:
-1. Highlights relevant experience from the resume
-2. Addresses key requirements from the job description  
-3. Shows genuine interest in the company and role
-4. Is professional yet personable
-5. Is approximately 3-4 paragraphs long
+### REFINEMENT EXECUTION RULES:
 
-Return the cover letter as plain text.
+#### QUALITY PRESERVATION:
+- Maintain all quantifiable achievements and specific details
+- Preserve authentic voice and human-like language patterns
+- Keep all company-specific research and connections
+- Retain professional structure and flow
+
+#### ENHANCEMENT STRATEGY:
+{f'''
+**TONE REFINEMENT:** Adjust language formality, enthusiasm level, and professional voice while keeping content integrity
+''' if refinement_type == 'tone' else ''}
+
+{f'''
+**LENGTH OPTIMIZATION:** {'Condense to essential high-impact content' if 'shorter' in (specific_feedback or '') else 'Expand with relevant details and examples'}
+''' if refinement_type == 'length' else ''}
+
+{f'''
+**PERSONALIZATION BOOST:** Add 2+ specific references to {target_company}, demonstrate deeper research, show cultural alignment
+''' if refinement_type == 'personalization' else ''}
+
+{f'''
+**ACHIEVEMENT ENHANCEMENT:** Strengthen metrics, add business impact context, improve result quantification
+''' if refinement_type == 'achievements' else ''}
+
+{f'''
+**INDUSTRY ALIGNMENT:** Integrate {industry}-specific terminology, priorities, and communication standards
+''' if refinement_type == 'industry_alignment' else ''}
+
+#### CRITICAL REQUIREMENTS:
+1. **Zero Quality Degradation:** Refined version must score higher on human-quality metrics
+2. **Authentic Enhancement:** All additions must sound natural and researched
+3. **Impact Amplification:** Every change should increase hiring manager engagement
+4. **ATS Optimization:** Maintain keyword density while improving readability
+5. **Professional Excellence:** Perfect grammar, varied sentence structure, compelling flow
+
+### OUTPUT REQUIREMENTS:
+Provide the refined cover letter that:
+- Addresses the specific refinement request perfectly
+- Maintains all existing strengths
+- Enhances overall effectiveness and human quality
+- Remains authentic and compelling
+- Passes all professional standards
+
+Generate the enhanced version now.
 """
 
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_output_tokens": 2048
+        }
         
-        return JSONResponse(content={"cover_letter": response.text.strip()})
+        response = model.generate_content(prompt, generation_config=generation_config)
+        refined_letter = response.text.strip()
+        
+        # Validate refinement quality
+        original_quality = validate_human_quality(original_letter, "", target_company)
+        refined_quality = validate_human_quality(refined_letter, "", target_company)
+        
+        improvement_score = refined_quality["overall_score"] - original_quality["overall_score"]
+        
+        return JSONResponse(content={
+            "cover_letter": cover_letter,
+            "quality_metrics": quality_validation,
+            "effectiveness_analysis": effectiveness_analysis,
+            "industry_optimization": {
+                "industry": industry,
+                "tone_applied": tone,
+                "length_category": preferred_length,
+                "industry_keywords_used": industry_insights.get('keywords_priority', [])[:5]
+            },
+            "generation_metadata": {
+                "model_version": "gemini-1.5-flash",
+                "prompt_version": "human-centric-v2.0",
+                "temperature": 0.8,
+                "quality_score": quality_validation["overall_score"]
+        }
+})
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/skill-gap-analysis/")
-async def skill_gap_analysis(
-    current_skills: str = Query(..., description="Comma-separated list of current skills"),
-    target_role: str = Query(..., description="Target job role")
+@app.get("/company-research/")
+async def research_company(
+    company_name: str = Query(...),
+    industry: Optional[str] = Query(None)
 ):
-    """Analyze skill gaps for career transition"""
+    """Enhanced company research for premium cover letter personalization"""
     try:
-        prompt = f"""
-Analyze the skill gap for someone with these current skills: {current_skills}
-Who wants to transition to: {target_role}
-
-Provide a JSON response with:
-{{
-    "skill_gap_analysis": {{
-        "matching_skills": ["<skill 1>", "<skill 2>"],
-        "missing_critical_skills": [
-            {{
-                "skill": "<skill name>",
-                "importance": "<high/medium/low>",
-                "learning_path": "<suggested learning approach>",
-                "time_estimate": "<time to acquire>",
-                "resources": ["<resource 1>", "<resource 2>"]
-            }}
-        ],
-        "transferable_skills": ["<skill 1>", "<skill 2>"],
-        "career_transition_timeline": "<realistic timeline>",
-        "intermediate_roles": ["<role 1>", "<role 2>"],
-        "certification_recommendations": ["<cert 1>", "<cert 2>"]
-    }}
-}}
-"""
-
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
+        industry_insights = get_industry_insights(industry or "technology")
         
-        json_match = re.search(r'\{.*\}', response.text.strip(), re.DOTALL)
-        if json_match:
-            parsed_result = json.loads(json_match.group())
-            return JSONResponse(content={"result": parsed_result})
-        else:
-            return JSONResponse(content={"result": {"raw_response": response.text}})
+        # This would integrate with real APIs in production
+        research_data = {
+            "company_profile": {
+                "name": company_name,
+                "industry": industry or "Technology",
+                "size_estimate": "Scale-up (100-1000 employees)",
+                "stage": "Growth stage",
+                "headquarters": "Research location for local relevance"
+            },
+            "personalization_opportunities": {
+                "mission_alignment": f"Research {company_name}'s mission statement and core values",
+                "recent_developments": f"Find {company_name}'s latest product launches, funding, or news",
+                "culture_insights": f"Review {company_name}'s employee testimonials and culture pages",
+                "technology_stack": f"Identify {company_name}'s technical infrastructure and tools",
+                "growth_trajectory": f"Understand {company_name}'s expansion plans and market position"
+            },
+            "cover_letter_hooks": [
+                f"Reference {company_name}'s recent achievement or milestone",
+                f"Connect personal values to {company_name}'s stated mission",
+                f"Mention specific {company_name} products or services you've researched",
+                f"Highlight alignment with {company_name}'s growth stage and culture",
+                f"Reference {company_name}'s industry leadership or innovation"
+            ],
+            "industry_context": {
+                "focus_areas": industry_insights.get('focus_areas', []),
+                "research_priorities": industry_insights.get('company_research_focus', []),
+                "communication_style": industry_insights.get('preferred_tone', 'professional')
+            },
+            "recommended_research_sources": [
+                f"{company_name} official website and blog",
+                f"{company_name} LinkedIn company page",
+                f"Recent news about {company_name}",
+                f"Employee reviews on Glassdoor",
+                f"Industry reports mentioning {company_name}"
+            ]
+        }
+        
+        return JSONResponse(content=research_data)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/validate-quality/")
+async def validate_quality(
+    cover_letter: str = Form(...),
+    jd_text: str = Form(...),
+    company_name: str = Form(...),
+    industry: str = Form(...)
+):
+    """Standalone quality validation endpoint"""
+    try:
+        quality_metrics = validate_human_quality(cover_letter, jd_text, company_name)
+        effectiveness_analysis = analyze_cover_letter_effectiveness(cover_letter, jd_text, "")
+        industry_insights = get_industry_insights(industry)
+        
+        # Industry-specific validation
+        industry_score = 100
+        industry_feedback = []
+        
+        required_keywords = industry_insights.get('keywords_priority', [])[:5]
+        found_keywords = [kw for kw in required_keywords if kw.lower() in cover_letter.lower()]
+        keyword_coverage = len(found_keywords) / len(required_keywords) if required_keywords else 1
+        
+        if keyword_coverage < 0.6:
+            industry_feedback.append(f"Low industry keyword coverage: {keyword_coverage*100:.0f}%")
+            industry_score -= 20
             
+        avoid_phrases = industry_insights.get('avoid_phrases', [])
+        found_avoid = [phrase for phrase in avoid_phrases if phrase.lower() in cover_letter.lower()]
+        if found_avoid:
+            industry_feedback.append(f"Contains industry-inappropriate phrases: {found_avoid}")
+            industry_score -= 15 * len(found_avoid)
+        
+        return JSONResponse(content={
+            "overall_assessment": {
+                "human_quality_score": quality_metrics["overall_score"],
+                "industry_alignment_score": max(0, industry_score),
+                "effectiveness_rating": effectiveness_analysis["content_analysis"],
+                "recommendation": quality_metrics["recommendation"]
+            },
+            "detailed_analysis": {
+                "human_quality_breakdown": quality_metrics["component_scores"],
+                "identified_issues": quality_metrics["issues"],
+                "industry_feedback": industry_feedback,
+                "improvement_suggestions": effectiveness_analysis["improvement_suggestions"]
+            },
+            "benchmarking": {
+                "industry_standards": industry,
+                "quality_tier": "Excellent" if quality_metrics["overall_score"] >= 85 else 
+                              "Good" if quality_metrics["overall_score"] >= 70 else "Needs Improvement",
+                "competitive_readiness": "High" if quality_metrics["overall_score"] >= 80 and industry_score >= 80 else "Medium"
+            }
+        })
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/extract-text/")
 async def extract_text_only(resume: UploadFile):
-    """Debug endpoint to see extracted text"""
+    """Enhanced text extraction with analysis"""
     try:
         content = await resume.read()
-        
         file_extension = resume.filename.lower().split('.')[-1] if resume.filename else ""
         
         if file_extension == 'pdf':
@@ -430,19 +1109,54 @@ async def extract_text_only(resume: UploadFile):
         else:
             resume_text = content.decode("utf-8", errors="ignore")
         
-        # Add basic text analysis
+        # Enhanced analysis
+        achievements = extract_quantifiable_achievements(resume_text) if resume_text else []
+        technical_skills = extract_technical_skills(resume_text) if resume_text else {}
         basic_analysis = extract_basic_keywords(resume_text) if resume_text else {}
         
         return JSONResponse(content={
-            "filename": resume.filename,
-            "file_type": file_extension,
-            "text_length": len(resume_text) if resume_text else 0,
-            "extracted_text": resume_text[:2000] + "..." if resume_text and len(resume_text) > 2000 else resume_text,
-            "basic_analysis": basic_analysis
+            "extraction_results": {
+                "filename": resume.filename,
+                "file_type": file_extension,
+                "text_length": len(resume_text) if resume_text else 0,
+                "extraction_success": bool(resume_text and len(resume_text.strip()) > 50)
+            },
+            "content_preview": {
+                "extracted_text": resume_text[:2000] + "..." if resume_text and len(resume_text) > 2000 else resume_text,
+            },
+            "content_analysis": {
+                "quantifiable_achievements": achievements[:5],
+                "technical_skills_found": technical_skills,
+                "keyword_analysis": basic_analysis,
+                "readiness_for_cover_letter": len(achievements) > 0 and len(technical_skills) > 0
+            }
         })
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def extract_basic_keywords(text: str) -> dict:
+    """Enhanced keyword extraction with categorization"""
+    if not text:
+        return {}
+    
+    # Professional keywords
+    professional_words = re.findall(r'\b(?:led|managed|developed|implemented|achieved|optimized|created|designed|analyzed|coordinated)\b', text.lower())
+    
+    # Technical keywords  
+    technical_words = re.findall(r'\b(?:python|java|javascript|react|angular|aws|docker|sql|api|machine learning|data analysis)\b', text.lower(), re.IGNORECASE)
+    
+    # General keywords
+    all_words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+    word_counts = Counter(all_words)
+    top_keywords = [word for word, _ in word_counts.most_common(20)]
+    
+    return {
+        "top_keywords": top_keywords,
+        "professional_action_words": list(set(professional_words)),
+        "technical_keywords": list(set(technical_words)),
+        "keyword_density": len(set(all_words)) / len(all_words) if all_words else 0
+    }
 
 if __name__ == "__main__":
     import uvicorn

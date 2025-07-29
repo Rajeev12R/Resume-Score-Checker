@@ -1,0 +1,8 @@
+fastapi
+google.generativeai
+dotenv
+pdfplumber
+docx2txt
+requests
+uvicorn
+python-multipart
