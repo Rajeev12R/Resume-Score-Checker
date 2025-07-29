@@ -1,4 +1,4 @@
-#!/Users/ranjan/ai-resume-score-checker/server/venv/bin/python3.11
+#!/Users/ranjan/Resume-Score-Checker/server/venv/bin/python3.11
 """Extract pdf structure in XML format"""
 
 import logging
