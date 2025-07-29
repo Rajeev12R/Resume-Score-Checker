@@ -1,3 +1,5 @@
+// web\src\components\resume-analysis\resume-analysis-form.tsx
+
 "use client"
 import { useDropzone } from "react-dropzone"
 import { X, Mail, Upload, FileText, Zap, BookOpen, ClipboardEdit } from "lucide-react"
