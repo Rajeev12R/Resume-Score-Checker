@@ -11,15 +11,144 @@ import re
 import pdfplumber
 import docx2txt
 from io import BytesIO
-from typing import Optional, List
+from typing import Optional, List, Dict
 import asyncio
 from datetime import datetime
 import requests
 from collections import Counter
 import random
+import time
+from datetime import datetime, timedelta
+import logging
 
 # Load environment variables
 load_dotenv()
+
+class SmartAPIKeyManager:
+    def __init__(self, api_keys: List[str]):
+        self.api_keys = api_keys
+        self.key_status = {}  # Track key health and usage
+        self.current_key_index = 0
+        self.last_rotation = time.time()
+        self.rotation_interval = 300  # 5 minutes between rotations
+        
+        # Initialize key status
+        for key in api_keys:
+            self.key_status[key] = {
+                'healthy': True,
+                'last_used': 0,
+                'error_count': 0,
+                'cooldown_until': 0,
+                'daily_reset': datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            }
+        
+        print(f"🔑 Initialized with {len(api_keys)} API keys")
+    
+    def get_active_key(self) -> str:
+        """Get the best available API key with smart rotation"""
+        current_time = time.time()
+        
+        # Reset daily counters if needed
+        self._reset_daily_status()
+        
+        # Remove keys from cooldown
+        self._update_cooldowns()
+        
+        # Strategy 1: Try round-robin rotation with time-based switching
+        if current_time - self.last_rotation > self.rotation_interval:
+            self._rotate_to_next_healthy_key()
+            self.last_rotation = current_time
+        
+        # Strategy 2: If current key is unhealthy, find a healthy one
+        current_key = self.api_keys[self.current_key_index]
+        if not self._is_key_healthy(current_key):
+            healthy_key = self._find_healthy_key()
+            if healthy_key:
+                self.current_key_index = self.api_keys.index(healthy_key)
+                current_key = healthy_key
+                print(f"🔄 Switched to healthy key: ...{current_key[-8:]}")
+        
+        # Update usage tracking
+        self.key_status[current_key]['last_used'] = current_time
+        return current_key
+    
+    def mark_key_error(self, api_key: str, error_message: str = ""):
+        """Mark a key as having errors for smart fallback"""
+        if api_key in self.key_status:
+            self.key_status[api_key]['error_count'] += 1
+            
+            # If quota exceeded, put in longer cooldown
+            if 'quota' in error_message.lower() or 'limit' in error_message.lower():
+                self.key_status[api_key]['cooldown_until'] = time.time() + 3600  # 1 hour cooldown
+                self.key_status[api_key]['healthy'] = False
+                print(f"⚠️  Key quota exceeded, cooling down: ...{api_key[-8:]}")
+            
+            # If too many errors, mark unhealthy temporarily
+            elif self.key_status[api_key]['error_count'] >= 3:
+                self.key_status[api_key]['cooldown_until'] = time.time() + 600  # 10 min cooldown
+                self.key_status[api_key]['healthy'] = False
+                print(f"⚠️  Key marked unhealthy due to errors: ...{api_key[-8:]}")
+    
+    def mark_key_success(self, api_key: str):
+        """Mark a key as working successfully"""
+        if api_key in self.key_status:
+            self.key_status[api_key]['error_count'] = max(0, self.key_status[api_key]['error_count'] - 1)
+            self.key_status[api_key]['healthy'] = True
+    
+    def _is_key_healthy(self, api_key: str) -> bool:
+        """Check if a key is currently healthy"""
+        status = self.key_status.get(api_key, {})
+        return (status.get('healthy', True) and 
+                time.time() > status.get('cooldown_until', 0))
+    
+    def _find_healthy_key(self) -> Optional[str]:
+        """Find the best healthy key to use"""
+        healthy_keys = [key for key in self.api_keys if self._is_key_healthy(key)]
+        
+        if not healthy_keys:
+            # All keys are unhealthy, use the one with shortest cooldown
+            return min(self.api_keys, 
+                      key=lambda k: self.key_status[k].get('cooldown_until', 0))
+        
+        # Return random healthy key for load balancing
+        return random.choice(healthy_keys)
+    
+    def _rotate_to_next_healthy_key(self):
+        """Rotate to the next healthy key in sequence"""
+        for _ in range(len(self.api_keys)):
+            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+            if self._is_key_healthy(self.api_keys[self.current_key_index]):
+                break
+    
+    def _update_cooldowns(self):
+        """Remove expired cooldowns"""
+        current_time = time.time()
+        for key in self.key_status:
+            if current_time > self.key_status[key]['cooldown_until']:
+                self.key_status[key]['healthy'] = True
+    
+    def _reset_daily_status(self):
+        """Reset daily counters at midnight"""
+        now = datetime.now()
+        for key in self.key_status:
+            if now > self.key_status[key]['daily_reset']:
+                self.key_status[key]['error_count'] = 0
+                self.key_status[key]['healthy'] = True
+                self.key_status[key]['cooldown_until'] = 0
+                self.key_status[key]['daily_reset'] = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    
+    def get_status_report(self) -> Dict:
+        """Get current status of all keys"""
+        report = {}
+        for i, key in enumerate(self.api_keys):
+            status = self.key_status[key]
+            report[f"Key_{i+1}"] = {
+                'healthy': status['healthy'],
+                'error_count': status['error_count'],
+                'in_cooldown': time.time() < status['cooldown_until'],
+                'is_current': i == self.current_key_index
+            }
+        return report
 
 app = FastAPI()
 
@@ -32,10 +161,62 @@ app.add_middleware(
 )
 
 # Setup Gemini API
-api_key = os.getenv("GEMINI_API_KEY")
-if not api_key:
-    raise ValueError("No GEMINI_API_KEY found in environment variables")
-genai.configure(api_key=api_key)
+api_keys_str = os.getenv("GEMINI_API_KEYS")
+if not api_keys_str:
+    raise ValueError("No GEMINI_API_KEYS found in environment variables")
+
+api_keys_list = [key.strip() for key in api_keys_str.split(",") if key.strip()]
+if not api_keys_list:
+    raise ValueError("No valid API keys found in GEMINI_API_KEYS")
+
+# Initialize the smart key manager
+key_manager = SmartAPIKeyManager(api_keys_list)
+
+# Configure with initial key
+genai.configure(api_key=key_manager.get_active_key())
+
+async def smart_gemini_call(prompt: str, generation_config: dict = None, max_retries: int = 3):
+    """
+    Smart Gemini API call with automatic key rotation and error handling
+    """
+    for attempt in range(max_retries):
+        try:
+            # Get the best available key
+            current_key = key_manager.get_active_key()
+            
+            # Configure API with current key
+            genai.configure(api_key=current_key)
+            
+            # Make the API call
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            
+            if generation_config:
+                response = await model.generate_content_async(prompt, generation_config=generation_config)
+            else:
+                response = await model.generate_content_async(prompt)
+            
+            # Mark success
+            key_manager.mark_key_success(current_key)
+            
+            return response
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            # Mark key error for smart fallback
+            key_manager.mark_key_error(current_key, error_msg)
+            
+            # If it's a quota/limit error and we have more attempts, try another key
+            if ('quota' in error_msg or 'limit' in error_msg or 'rate' in error_msg) and attempt < max_retries - 1:
+                print(f"🔄 API limit hit, rotating to next key (attempt {attempt + 1}/{max_retries})")
+                continue
+            
+            # If final attempt or non-quota error, raise the exception
+            if attempt == max_retries - 1:
+                print(f"❌ All API attempts failed. Error: {str(e)}")
+                raise e
+            
+    raise Exception("All API key attempts exhausted")
 
 def extract_text_from_pdf(file_content):
     """Extract text from PDF using pdfplumber"""
@@ -289,7 +470,7 @@ async def analyze_resume(
         prompt = build_analysis_prompt(jd_text, resume_text)
         
         model = genai.GenerativeModel("gemini-1.5-flash")
-        response = await model.generate_content_async(prompt)
+        response = await smart_gemini_call(prompt)
         
         # Clean the response text to extract only the JSON
         response_text = response.text.strip()
@@ -785,7 +966,7 @@ async def generate_cover_letter(
             "candidate_count": 1
         }
         
-        response = model.generate_content(prompt, generation_config=generation_config)
+        response = await smart_gemini_call(prompt, generation_config)
 
         if not response.text:
             raise HTTPException(status_code=500, detail="Empty response from AI model")
@@ -816,7 +997,7 @@ MANDATORY REQUIREMENTS FOR REGENERATION:
 REGENERATE NOW with perfect human quality.
 """
             
-            response = model.generate_content(enhanced_prompt, generation_config=generation_config)
+            response = await smart_gemini_call(enhanced_prompt, generation_config)
             cover_letter = response.text.strip()
             quality_validation = validate_human_quality(cover_letter, jd_text, company_name)
 
