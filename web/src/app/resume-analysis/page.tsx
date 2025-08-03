@@ -130,7 +130,7 @@ export default function ResumeAnalyzerPage() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
 
-    const res = await fetch("http://localhost:8000/generate-cover-letter/", {
+    const res = await fetch("https://resume-score-checker.onrender.com/generate-cover-letter/", {
       method: "POST",
       body: formData,
       signal: controller.signal
@@ -178,7 +178,7 @@ export default function ResumeAnalyzerPage() {
     formData.append("resume", resumeFile)
 
     try {
-      const res = await fetch("http://localhost:8000/extract-text/", {
+      const res = await fetch("https://resume-score-checker.onrender.com/extract-text/", {
         method: "POST",
         body: formData,
       })
@@ -240,7 +240,7 @@ export default function ResumeAnalyzerPage() {
     formData.append("jd_text", jdText)
 
     try {
-      const res = await fetch("http://localhost:8000/analyze/", {
+      const res = await fetch("https://resume-score-checker.onrender.com/analyze/", {
         method: "POST",
         body: formData,
       })
