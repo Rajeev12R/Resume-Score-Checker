@@ -77,7 +77,7 @@ export default function CoverLetterFormModal({
     setIsResearchingCompany(true)
     try {
       const response = await fetch(
-        `http://localhost:8000/company-research/?company_name=${encodeURIComponent(coverLetterData.companyName)}&industry=${encodeURIComponent(coverLetterData.industry)}`
+        `https://resume-score-checker.onrender.com/company-research/?company_name=${encodeURIComponent(coverLetterData.companyName)}&industry=${encodeURIComponent(coverLetterData.industry)}`
       )
       if (response.ok) {
         const data = await response.json()
