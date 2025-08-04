@@ -155,7 +155,7 @@ app = FastAPI()
 # Allow CORS from your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["https://resume-ai-score-checker.vercel.app"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
