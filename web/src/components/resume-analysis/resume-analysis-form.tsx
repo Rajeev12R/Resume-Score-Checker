@@ -138,7 +138,7 @@ export default function ResumeAnalysisForm({
           Generate Cover Letter
         </button>
 
-        {resumeFile && (
+        {/* {resumeFile && (
           <button
             onClick={handleExtractText}
             disabled={isLoading}
@@ -147,7 +147,7 @@ export default function ResumeAnalysisForm({
             <BookOpen className="w-4 h-4" />
             View Extracted Text
           </button>
-        )}
+        )} */}
       </div>
     </div>
   )

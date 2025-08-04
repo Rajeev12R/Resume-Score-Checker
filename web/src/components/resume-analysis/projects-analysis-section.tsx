@@ -3,7 +3,7 @@
 import { Code, CheckCircle, AlertTriangle, Zap, Sparkles, ChevronDown, ChevronUp } from "lucide-react"
 
 interface ProjectsAnalysisSectionProps {
-  projects: any[]
+  projects: Record<string, any>[]
   activeSection: string | null
   toggleSection: (section: string) => void
 }

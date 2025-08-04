@@ -68,9 +68,9 @@ interface CoverLetterResult {
 export default function ResumeAnalyzerPage() {
   const [resumeFile, setResumeFile] = useState<File | null>(null)
   const [jdText, setJdText] = useState("")
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
+  const [analysisResult, setAnalysisResult] = useState<Record<string, any> | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [extractedText, setExtractedText] = useState<any>(null)
+  const [extractedText, setExtractedText] = useState<Record<string, any> | null>(null)
   const [showExtractedText, setShowExtractedText] = useState(false)
   const [activeSection, setActiveSection] = useState<string | null>(null)
 

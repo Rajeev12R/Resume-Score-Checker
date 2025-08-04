@@ -11,7 +11,7 @@ import RecommendationsSection from "./recommendations-section"
 
 interface AnalysisResultsDisplayProps {
   isLoading: boolean
-  analysisResult: any
+  analysisResult: Record<string, any> | null
   handleStartOver: () => void
   activeSection: string | null
   toggleSection: (section: string) => void

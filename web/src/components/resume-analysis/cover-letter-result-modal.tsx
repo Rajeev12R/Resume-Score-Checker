@@ -235,10 +235,10 @@ export default function CoverLetterResultModal({
                   </div>
 
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Achievements Highlighted:</strong> {effectivenessAnalysis.content_analysis.quantified_achievements} quantified results
-                    </p>
-                  </div>
+                  <p className="text-sm text-blue-800">
+                    <strong>Achievements Highlighted:</strong> {effectivenessAnalysis.content_analysis.quantified_achievements} quantified results
+                  </p>
+                </div>
                 </div>
 
                 {effectivenessAnalysis.improvement_suggestions.length > 0 && (

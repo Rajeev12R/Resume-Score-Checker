@@ -3,7 +3,7 @@
 import { ClipboardCheck, Code, Users, Briefcase, ChevronDown, ChevronUp } from "lucide-react"
 
 interface InterviewPrepSectionProps {
-  prep: any
+  prep: Record<string, any>
   activeSection: string | null
   toggleSection: (section: string) => void
 }

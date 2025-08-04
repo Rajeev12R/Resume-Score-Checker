@@ -7,22 +7,24 @@
 import { useState } from "react"
 import { X, Mail, Sparkles, Building2, User, Target, Palette, Clock, Lightbulb, Search } from "lucide-react"
 
+interface CoverLetterData {
+  companyName: string
+  roleTitle: string
+  industry: string
+  companyValues: string
+  personalTouch: string
+  tone: string
+  experienceLevel: string
+  coverLetterType: string
+  keyAchievements: string
+  preferredLength: string
+}
+
 interface CoverLetterFormModalProps {
   showCoverLetterForm: boolean
   setShowCoverLetterForm: (show: boolean) => void
-  coverLetterData: {
-    companyName: string
-    roleTitle: string
-    industry: string
-    companyValues: string
-    personalTouch: string
-    tone: string
-    experienceLevel: string
-    coverLetterType: string
-    keyAchievements: string
-    preferredLength: string
-  }
-  setCoverLetterData: (data: any) => void
+  coverLetterData: CoverLetterData
+  setCoverLetterData: React.Dispatch<React.SetStateAction<CoverLetterData>> | ((data: Record<string, any>) => void)
   handleGenerateCoverLetter: () => void
   isGeneratingCoverLetter: boolean
 }

@@ -22,12 +22,12 @@ export function Button({
 }: {
   borderRadius?: string
   children: React.ReactNode
-  as?: any
+  as?: React.ElementType
   containerClassName?: string
   borderClassName?: string
   duration?: number
   className?: string
-  [key: string]: any
+  [key: string]: unknown
 }) {
   return (
     <Component
@@ -80,12 +80,12 @@ export const MovingBorder = ({
   duration?: number
   rx?: string
   ry?: string
-  [key: string]: any
+  [key: string]: unknown
 }) => {
-  const pathRef = useRef<any>(null)
+  const pathRef = useRef<SVGRectElement>(null)
   const progress = useMotionValue<number>(0)
 
-  useAnimationFrame((time) => {
+  useAnimationFrame((time: number) => {
     let length = 0
     try {
       if (
@@ -122,8 +122,8 @@ export const MovingBorder = ({
     return { x: 0, y: 0 }
   }
 
-  const x = useTransform(progress, (val) => getPoint(val).x)
-  const y = useTransform(progress, (val) => getPoint(val).y)
+  const x = useTransform(progress, (val: number) => getPoint(val).x)
+  const y = useTransform(progress, (val: number) => getPoint(val).y)
 
   const transform = useMotionTemplate`translateX(${x}px) translateY(${y}px) translateX(-50%) translateY(-50%)`
 

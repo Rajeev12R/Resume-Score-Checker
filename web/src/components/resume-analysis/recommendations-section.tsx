@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 
 interface RecommendationsSectionProps {
-  recommendations: any[]
+  recommendations: Record<string, any>[]
   activeSection: string | null
   toggleSection: (section: string) => void
 }

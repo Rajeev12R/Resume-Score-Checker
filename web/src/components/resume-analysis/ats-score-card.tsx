@@ -2,7 +2,7 @@ import { Sparkles, Layout, Type, Target, CheckCircle, AlertTriangle } from "luci
 import ReactMarkdown from "react-markdown"
 
 interface ATSScoreCardProps {
-  atsScore: any
+  atsScore: Record<string, any>
 }
 
 export default function ATSScoreCard({ atsScore }: ATSScoreCardProps) {

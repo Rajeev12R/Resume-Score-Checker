@@ -1,3 +1,5 @@
+
+
 "use client"
 
 import { PenTool, AlertCircle, CheckCircle, ArrowRight, ChevronDown, ChevronUp } from "lucide-react"
@@ -10,7 +12,7 @@ interface WritingIssue {
 }
 
 interface WritingQualitySectionProps {
-  writing: any
+  writing: Record<string, any>
   activeSection: string | null
   toggleSection: (section: string) => void
 }
@@ -76,7 +78,7 @@ export default function WritingQualitySection({ writing, activeSection, toggleSe
                 </div>
 
                 <div className="space-y-4">
-                  {(writing.issues as WritingIssue[]).map((issue: WritingIssue, index: number) => (
+                  {writing.issues.map((issue: WritingIssue, index: number) => (
                     <div key={index} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
                       <div className="p-4 bg-white border-b border-gray-100">
                         <div className="flex items-center gap-2 mb-1">

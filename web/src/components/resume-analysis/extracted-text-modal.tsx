@@ -5,7 +5,7 @@ import { X } from "lucide-react"
 interface ExtractedTextModalProps {
   showExtractedText: boolean
   setShowExtractedText: (show: boolean) => void
-  extractedText: any
+  extractedText: Record<string, any> | null
 }
 
 export default function ExtractedTextModal({
@@ -27,13 +27,13 @@ export default function ExtractedTextModal({
           <X className="w-5 h-5 text-slate-600" />
         </button>
         <h3 className="text-2xl font-bold text-slate-900 mb-6 border-b pb-3">Extracted Resume Text</h3>
-        {extractedText.error ? (
+        {extractedText?.error ? (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4">
             <p className="text-red-700">{extractedText.error}</p>
           </div>
         ) : (
           <pre className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-800 whitespace-pre-wrap font-mono">
-            {extractedText.extracted_text}
+            {extractedText?.extracted_text}
           </pre>
         )}
       </div>

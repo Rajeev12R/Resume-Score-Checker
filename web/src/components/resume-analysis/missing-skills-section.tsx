@@ -3,7 +3,7 @@
 import { AlertTriangle, CheckCircle, BookOpen, FileBadge, ChevronDown, ChevronUp } from "lucide-react"
 
 interface MissingSkillsSectionProps {
-  skills: any[]
+  skills: Record<string, any>[]
   activeSection: string | null
   toggleSection: (section: string) => void
 }
