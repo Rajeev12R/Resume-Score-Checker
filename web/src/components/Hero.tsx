@@ -62,9 +62,6 @@ const Button = ({
 
 // Enhanced MacBook Component with realistic 3D perspective and video
 const MacBookDemo = () => {
-  // Placeholder YouTube video ID - replace with your actual demo video ID
-  const YOUTUBE_VIDEO_ID = "dQw4w9WgXcQ" // Example: Rick Astley - Never Gonna Give You Up
-  const youtubeEmbedUrl = `https://www.youtube.com/embed/${YOUTUBE_VIDEO_ID}?autoplay=1&mute=1&loop=1&playlist=${YOUTUBE_VIDEO_ID}&controls=0&modestbranding=1&showinfo=0&rel=0`
 
   return (
     <div className="relative w-full max-w-3xl mx-auto">
@@ -204,14 +201,13 @@ const MacBookDemo = () => {
 
               {/* Screen Content with YouTube Video */}
               <div className="w-full h-full bg-white rounded-2xl overflow-hidden relative shadow-inner">
-                <iframe
-                  src={youtubeEmbedUrl}
-                  frameBorder="0"
-                  allow="autoplay; encrypted-media"
-                  allowFullScreen
+                <video
+                  src="/resumeai.mp4"
+                  autoPlay
+                  loop
                   className="absolute inset-0 w-full h-full"
                   title="ResumeAI Demo Video"
-                ></iframe>
+                ></video>
               </div>
             </div>
 
